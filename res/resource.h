@@ -1,0 +1,6 @@
+#ifndef LUNAPASSPORT_RESOURCE_H
+#define LUNAPASSPORT_RESOURCE_H
+
+#define IDR_ISRG_ROOT_X1 101
+
+#endif

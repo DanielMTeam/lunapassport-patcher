@@ -1,0 +1,5 @@
+#include "resource.h"
+
+1 RT_MANIFEST "app.manifest"
+
+IDR_ISRG_ROOT_X1 RCDATA "isrgrootx1.der"

@@ -1,4 +1,5 @@
 #include "config.h"
+#include "i18n.h"
 #include "util.h"
 
 #include <sstream>
@@ -25,8 +26,8 @@ bool PatchConfig::BuildFromInput(const std::string& ipInput, const std::string& 
 
 std::wstring PatchConfig::PreviewText() const {
     std::wstringstream ss;
-    ss << L"passport: " << Utf8ToWide(passportHost) << L"\r\n"
-       << L"memberservices: " << Utf8ToWide(memberservicesHost) << L"\r\n"
-       << L"hosts: " << Utf8ToWide(ip) << L" + register.passport.com";
+    ss << Tr(STR_PREVIEW_PASSPORT) << Utf8ToWide(passportHost) << L"\r\n"
+       << Tr(STR_PREVIEW_MEMBERSERVICES) << Utf8ToWide(memberservicesHost) << L"\r\n"
+       << Tr(STR_PREVIEW_HOSTS) << Utf8ToWide(ip) << L" + register.passport.com";
     return ss.str();
 }

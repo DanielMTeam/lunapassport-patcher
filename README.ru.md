@@ -13,7 +13,18 @@ Win32 GUI для Windows XP: один `.exe`, который настраива�
 Нужно только:
 
 1. [CMake](https://cmake.org/download/)
-2. MinGW-w64 **32-bit** (`g++` в PATH)
+2. MinGW-w64 **i686 (32-bit) + MSVCRT** — не x86_64 и не UCRT
+
+**Важно для Windows XP:** exe должен быть 32-bit. Если собрать 64-bit MinGW (как WinLibs UCRT x86_64), на XP появится ошибка «не является приложением Win32».
+
+Автоустановка тулчейна:
+
+```bat
+setup-toolchain.bat
+build.bat
+```
+
+`setup-toolchain.bat` скачает WinLibs i686 GCC 12.4 MSVCRT в `tools\mingw32\`.
 
 Дальше — двойной клик или из cmd:
 
@@ -27,7 +38,11 @@ build.bat
 
 ### Если MinGW ещё не установлен
 
-Скачайте MinGW-w64 **i686** (32-bit), распакуйте, добавьте `bin` в PATH.
+Скачайте MinGW-w64 **i686 MSVCRT** (32-bit), распакуйте, добавьте `bin` в PATH.
+
+Или запустите `setup-toolchain.bat` — он скачает подходящую сборку автоматически.
+
+**Не подходит для XP:** x86_64 (64-bit) и UCRT runtime (Windows 7+).
 
 Проверка:
 
@@ -42,7 +57,7 @@ cmake --version
 2. Запустите **от имени администратора**.
 3. Введите:
    - **IP сервера** (где Traefik)
-   - **Базовый домен** (например `pidoras.top`)
+   - **Базовый домен** (например `lunastore.app`)
 4. Нажмите **Применить**.
 5. Перезапустите Internet Explorer 6.
 6. Откройте `https://passport-staging.<domain>/static/netpass/index.html`
@@ -51,10 +66,10 @@ cmake --version
 
 ## Что делает патч
 
-Из домена `pidoras.top` строятся:
+Из домена `lunastore.app` строятся:
 
-- `passport-staging.pidoras.top`
-- `memberservices-staging.pidoras.top`
+- `passport-staging.lunastore.app`
+- `memberservices-staging.lunastore.app`
 
 В `hosts` добавляется блок:
 

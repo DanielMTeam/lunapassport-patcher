@@ -1,4 +1,5 @@
 #include "hosts.h"
+#include "i18n.h"
 #include "util.h"
 
 #include <sstream>
@@ -90,10 +91,10 @@ bool PatchHostsFile(const PatchConfig& config, std::wstring& log) {
     if (!CopyFileW(hostsPath.c_str(), backupPath.c_str(), FALSE)) {
         DWORD error = GetLastError();
         if (error != ERROR_FILE_NOT_FOUND) {
-            log += L"[WARN] hosts backup failed: " + FormatWin32Error(error) + L"\r\n";
+            log += Tr(STR_LOG_HOSTS_BACKUP_WARN) + FormatWin32Error(error) + L"\r\n";
         }
     } else {
-        log += L"[OK] hosts backup: " + backupPath + L"\r\n";
+        log += Tr(STR_LOG_HOSTS_BACKUP_OK) + backupPath + L"\r\n";
     }
 
     RemoveMarkedBlock(content);
@@ -116,7 +117,7 @@ bool PatchHostsFile(const PatchConfig& config, std::wstring& log) {
 
     const std::wstring tempPath = hostsPath + L".lunapassport.tmp";
     if (!WriteWholeFile(tempPath, content)) {
-        log += L"[ERR] cannot write temp hosts file\r\n";
+        log += Tr(STR_LOG_HOSTS_WRITE_ERR);
         return false;
     }
 
@@ -124,10 +125,10 @@ bool PatchHostsFile(const PatchConfig& config, std::wstring& log) {
                      MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
         DWORD error = GetLastError();
         DeleteFileW(tempPath.c_str());
-        log += L"[ERR] cannot replace hosts: " + FormatWin32Error(error) + L"\r\n";
+        log += Tr(STR_LOG_HOSTS_REPLACE_ERR) + FormatWin32Error(error) + L"\r\n";
         return false;
     }
 
-    log += L"[OK] hosts updated\r\n";
+    log += Tr(STR_LOG_HOSTS_UPDATED);
     return true;
 }

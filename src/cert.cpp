@@ -1,4 +1,5 @@
 #include "cert.h"
+#include "i18n.h"
 #include "util.h"
 
 #include "resource.h"
@@ -35,7 +36,7 @@ static bool CertAlreadyInstalled(const BYTE* data, DWORD size) {
         return false;
     }
 
-    HCERTSTORE store = CertOpenStore(CERT_STORE_PROV_SYSTEM_W, 0, NULL,
+    HCERTSTORE store = CertOpenStore(CERT_STORE_PROV_SYSTEM_W, 0, 0,
                                      CERT_SYSTEM_STORE_LOCAL_MACHINE, L"ROOT");
     if (!store) {
         CertFreeCertificateContext(context);
@@ -58,19 +59,19 @@ static bool CertAlreadyInstalled(const BYTE* data, DWORD size) {
 bool ImportLetsEncryptRoot(std::wstring& log) {
     std::vector<BYTE> data;
     if (!LoadEmbeddedCert(data)) {
-        log += L"[ERR] embedded CA resource missing\r\n";
+        log += Tr(STR_LOG_CERT_MISSING);
         return false;
     }
 
     if (CertAlreadyInstalled(&data[0], static_cast<DWORD>(data.size()))) {
-        log += L"[OK] Let's Encrypt root already installed\r\n";
+        log += Tr(STR_LOG_CERT_ALREADY);
         return true;
     }
 
-    HCERTSTORE store = CertOpenStore(CERT_STORE_PROV_SYSTEM_W, 0, NULL,
+    HCERTSTORE store = CertOpenStore(CERT_STORE_PROV_SYSTEM_W, 0, 0,
                                      CERT_SYSTEM_STORE_LOCAL_MACHINE, L"ROOT");
     if (!store) {
-        log += L"[ERR] cannot open ROOT store\r\n";
+        log += Tr(STR_LOG_CERT_ROOT_ERR);
         return false;
     }
 
@@ -82,10 +83,10 @@ bool ImportLetsEncryptRoot(std::wstring& log) {
 
     if (!added) {
         DWORD error = GetLastError();
-        log += L"[ERR] CA import failed: " + FormatWin32Error(error) + L"\r\n";
+        log += Tr(STR_LOG_CERT_IMPORT_ERR) + FormatWin32Error(error) + L"\r\n";
         return false;
     }
 
-    log += L"[OK] Let's Encrypt root imported\r\n";
+    log += Tr(STR_LOG_CERT_IMPORTED);
     return true;
 }

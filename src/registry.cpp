@@ -1,4 +1,5 @@
 #include "registry.h"
+#include "i18n.h"
 #include "util.h"
 
 #include <sstream>
@@ -26,7 +27,7 @@ bool PatchPassportRegistry(const PatchConfig& config, std::wstring& log) {
     LONG result = RegCreateKeyExW(HKEY_LOCAL_MACHINE, subKey, 0, NULL, 0,
                                   KEY_SET_VALUE, NULL, &key, NULL);
     if (result != ERROR_SUCCESS) {
-        log += L"[ERR] registry open failed: " + FormatWin32Error(result) + L"\r\n";
+        log += Tr(STR_LOG_REG_OPEN_ERR) + FormatWin32Error(result) + L"\r\n";
         return false;
     }
 
@@ -53,10 +54,10 @@ bool PatchPassportRegistry(const PatchConfig& config, std::wstring& log) {
     RegCloseKey(key);
 
     if (!ok) {
-        log += L"[ERR] registry write failed\r\n";
+        log += Tr(STR_LOG_REG_WRITE_ERR);
         return false;
     }
 
-    log += L"[OK] Passport registry updated\r\n";
+    log += Tr(STR_LOG_REG_UPDATED);
     return true;
 }

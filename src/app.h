@@ -10,6 +10,8 @@
 #define IDC_APPLY_BTN      1005
 #define IDC_VERIFY_BTN     1006
 #define IDC_EXIT_BTN       1007
+#define IDC_HEADER_TITLE   1008
+#define IDC_HEADER_SUB     1009
 
 int RunApplication(HINSTANCE instance);
 

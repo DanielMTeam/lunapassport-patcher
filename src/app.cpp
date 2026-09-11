@@ -4,6 +4,7 @@
 #include "hosts.h"
 #include "i18n.h"
 #include "registry.h"
+#include "resource.h"
 #include "util.h"
 
 #include <commctrl.h>
@@ -12,20 +13,23 @@
 namespace {
 
 const wchar_t kWindowClass[] = L"LunaPassportPatcherWindow";
-const int kMargin = 16;
-const int kLabelHeight = 16;
-const int kEditHeight = 24;
-const int kButtonHeight = 30;
-const int kButtonWidth = 118;
-const int kButtonGap = 10;
-const int kWindowWidth = 560;
-const int kWindowHeight = 500;
-const int kHeaderHeight = 56;
-const int kGroupGap = 12;
-const int kGroupCaption = 18;
-const int kInnerPadX = 12;
-const int kInnerPadTop = 10;
-const int kInnerPadBottom = 8;
+const int kMargin = 10;
+const int kLabelColWidth = 110;
+const int kLabelGap = 6;
+const int kEditHeight = 22;
+const int kRowGap = 6;
+const int kButtonHeight = 26;
+const int kButtonWidth = 100;
+const int kButtonGap = 8;
+const int kWindowWidth = 420;
+const int kWindowHeight = 288;
+const int kHeaderHeight = 48;
+const int kGroupGap = 8;
+const int kGroupCaption = 16;
+const int kInnerPadX = 8;
+const int kInnerPadTop = 6;
+const int kInnerPadBottom = 6;
+const int kLogEditHeight = 70;
 
 const COLORREF kColorHeaderBg = RGB(41, 98, 204);
 const COLORREF kColorHeaderText = RGB(255, 255, 255);
@@ -36,7 +40,6 @@ const COLORREF kColorText = RGB(32, 32, 32);
 
 HWND gIpEdit = NULL;
 HWND gDomainEdit = NULL;
-HWND gPreviewEdit = NULL;
 HWND gLogEdit = NULL;
 HWND gLogGroup = NULL;
 HWND gHeaderTitle = NULL;
@@ -48,6 +51,7 @@ HFONT gFontHeaderSub = NULL;
 HBRUSH gBrushWindow = NULL;
 HBRUSH gBrushHeader = NULL;
 HBRUSH gBrushEdit = NULL;
+HBITMAP gHeaderBitmap = NULL;
 
 std::string GetEditTextUtf8(HWND edit) {
     int length = GetWindowTextLengthW(edit);
@@ -80,11 +84,14 @@ HFONT CreateAppFont(int height, bool bold) {
 
 void InitThemeResources() {
     gFontUi = CreateAppFont(-13, false);
-    gFontHeader = CreateAppFont(-16, true);
-    gFontHeaderSub = CreateAppFont(-12, false);
+    gFontHeader = CreateAppFont(-14, true);
+    gFontHeaderSub = CreateAppFont(-11, false);
     gBrushWindow = CreateSolidBrush(kColorWindowBg);
     gBrushHeader = CreateSolidBrush(kColorHeaderBg);
     gBrushEdit = CreateSolidBrush(kColorEditBg);
+    gHeaderBitmap = static_cast<HBITMAP>(LoadImageW(
+        GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDB_HEADER_BG), IMAGE_BITMAP, 0, 0,
+        LR_DEFAULTCOLOR));
 }
 
 void FreeThemeResources() {
@@ -112,18 +119,37 @@ void FreeThemeResources() {
         DeleteObject(gBrushEdit);
         gBrushEdit = NULL;
     }
+    if (gHeaderBitmap) {
+        DeleteObject(gHeaderBitmap);
+        gHeaderBitmap = NULL;
+    }
 }
 
-void UpdatePreview() {
-    PatchConfig config;
-    std::string ip = GetEditTextUtf8(gIpEdit);
-    std::string domain = GetEditTextUtf8(gDomainEdit);
-    if (!config.BuildFromInput(ip, domain)) {
-        SetWindowTextW(gPreviewEdit, L"");
+void PaintHeaderBackground(HDC hdc, int width) {
+    RECT header = {0, 0, width, kHeaderHeight};
+    if (!gHeaderBitmap) {
+        FillRect(hdc, &header, gBrushHeader);
         return;
     }
 
-    SetWindowTextW(gPreviewEdit, config.PreviewText().c_str());
+    HDC mem = CreateCompatibleDC(hdc);
+    if (!mem) {
+        FillRect(hdc, &header, gBrushHeader);
+        return;
+    }
+
+    HGDIOBJ old = SelectObject(mem, gHeaderBitmap);
+    BITMAP bm;
+    ZeroMemory(&bm, sizeof(bm));
+    GetObject(gHeaderBitmap, sizeof(bm), &bm);
+    if (bm.bmWidth > 0 && bm.bmHeight > 0) {
+        StretchBlt(hdc, 0, 0, width, kHeaderHeight, mem, 0, 0, bm.bmWidth, bm.bmHeight,
+                   SRCCOPY);
+    } else {
+        FillRect(hdc, &header, gBrushHeader);
+    }
+    SelectObject(mem, old);
+    DeleteDC(mem);
 }
 
 bool ValidateInput(PatchConfig& config, std::wstring& message) {
@@ -183,8 +209,6 @@ void VerifyInput(HWND window) {
         return;
     }
 
-    UpdatePreview();
-
     std::wstring message = Tr(STR_MSG_INPUT_OK);
     message += Utf8ToWide(config.passportHost);
     message += L"\r\n";
@@ -210,13 +234,9 @@ HWND CreateGroupBox(HWND parent, const wchar_t* text, int x, int y, int width, i
     return group;
 }
 
-HWND CreateEdit(HWND parent, int id, int x, int y, int width, int height, bool readOnly) {
-    DWORD style = WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL;
-    if (readOnly) {
-        style |= ES_READONLY | ES_MULTILINE;
-    }
-
-    HWND edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", style,
+HWND CreateEdit(HWND parent, int id, int x, int y, int width, int height) {
+    HWND edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
+                                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
                                 x, y, width, height, parent,
                                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
                                 GetModuleHandleW(NULL), NULL);
@@ -245,7 +265,7 @@ void CreateHeader(HWND window) {
     gHeaderTitle = CreateWindowExW(
         0, L"STATIC", Tr(STR_APP_TITLE),
         WS_CHILD | WS_VISIBLE | SS_LEFTNOWORDWRAP,
-        kMargin, 10, client.right - kMargin * 2, 22, window,
+        kMargin, 8, client.right - kMargin * 2, 16, window,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_HEADER_TITLE)),
         GetModuleHandleW(NULL), NULL);
     ApplyFont(gHeaderTitle, gFontHeader);
@@ -253,7 +273,7 @@ void CreateHeader(HWND window) {
     gHeaderSubtitle = CreateWindowExW(
         0, L"STATIC", Tr(STR_APP_SUBTITLE),
         WS_CHILD | WS_VISIBLE | SS_LEFTNOWORDWRAP,
-        kMargin, 32, client.right - kMargin * 2, 18, window,
+        kMargin, 26, client.right - kMargin * 2, 14, window,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_HEADER_SUB)),
         GetModuleHandleW(NULL), NULL);
     ApplyFont(gHeaderSubtitle, gFontHeaderSub);
@@ -275,18 +295,14 @@ void LayoutLogPanel(HWND window) {
     const int innerX = kMargin + kInnerPadX;
     const int innerWidth = contentWidth - kInnerPadX * 2;
     const int groupTop = groupRect.top;
-    const int groupHeight = client.bottom - kMargin - groupTop;
-
-    if (groupHeight < kGroupCaption + kInnerPadTop + kInnerPadBottom + 40) {
-        return;
-    }
+    const int groupHeight =
+        kGroupCaption + kInnerPadTop + kLogEditHeight + kInnerPadBottom;
 
     SetWindowPos(gLogGroup, NULL, kMargin, groupTop, contentWidth, groupHeight,
                  SWP_NOZORDER | SWP_NOACTIVATE);
 
     const int editTop = groupTop + kGroupCaption + kInnerPadTop;
-    const int editHeight = groupHeight - kGroupCaption - kInnerPadTop - kInnerPadBottom;
-    SetWindowPos(gLogEdit, NULL, innerX, editTop, innerWidth, editHeight,
+    SetWindowPos(gLogEdit, NULL, innerX, editTop, innerWidth, kLogEditHeight,
                  SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
@@ -295,30 +311,19 @@ void CreateUi(HWND window) {
     GetClientRect(window, &client);
 
     const int contentWidth = client.right - kMargin * 2;
-    const int innerX = kMargin + kInnerPadX;
-    const int innerWidth = contentWidth - kInnerPadX * 2;
+    const int editX = kMargin + kLabelColWidth + kLabelGap;
+    const int editWidth = client.right - kMargin - editX;
     int y = kHeaderHeight + kGroupGap;
 
-    const int connectionHeight =
-        kGroupCaption + kInnerPadTop + (kLabelHeight + 4 + kEditHeight) * 2 + 8 + kInnerPadBottom;
-    CreateGroupBox(window, Tr(STR_GROUP_CONNECTION), kMargin, y, contentWidth, connectionHeight);
-    y += kGroupCaption + kInnerPadTop;
+    const int labelY = y + (kEditHeight - 16) / 2;
+    CreateLabel(window, Tr(STR_LABEL_IP), kMargin, labelY, kLabelColWidth, 16);
+    gIpEdit = CreateEdit(window, IDC_IP_EDIT, editX, y, editWidth, kEditHeight);
+    y += kEditHeight + kRowGap;
 
-    CreateLabel(window, Tr(STR_LABEL_IP), innerX, y, innerWidth, kLabelHeight);
-    y += kLabelHeight + 4;
-    gIpEdit = CreateEdit(window, IDC_IP_EDIT, innerX, y, innerWidth, kEditHeight, false);
-    y += kEditHeight + 8;
-
-    CreateLabel(window, Tr(STR_LABEL_DOMAIN), innerX, y, innerWidth, kLabelHeight);
-    y += kLabelHeight + 4;
-    gDomainEdit = CreateEdit(window, IDC_DOMAIN_EDIT, innerX, y, innerWidth, kEditHeight, false);
+    const int domainLabelY = y + (kEditHeight - 16) / 2;
+    CreateLabel(window, Tr(STR_LABEL_DOMAIN), kMargin, domainLabelY, kLabelColWidth, 16);
+    gDomainEdit = CreateEdit(window, IDC_DOMAIN_EDIT, editX, y, editWidth, kEditHeight);
     y += kEditHeight + kGroupGap;
-
-    const int previewHeight = kGroupCaption + kInnerPadTop + 56 + kInnerPadBottom;
-    CreateGroupBox(window, Tr(STR_GROUP_PREVIEW), kMargin, y, contentWidth, previewHeight);
-    y += kGroupCaption + kInnerPadTop;
-    gPreviewEdit = CreateEdit(window, IDC_PREVIEW_EDIT, innerX, y, innerWidth, 56, true);
-    y += 56 + kGroupGap;
 
     CreateButton(window, Tr(STR_BTN_APPLY), IDC_APPLY_BTN, kMargin, y, true);
     CreateButton(window, Tr(STR_BTN_VERIFY), IDC_VERIFY_BTN,
@@ -327,19 +332,19 @@ void CreateUi(HWND window) {
                  kMargin + (kButtonWidth + kButtonGap) * 2, y, false);
     y += kButtonHeight + kGroupGap;
 
-    const int logGroupTop = y;
-    const int logGroupHeight = client.bottom - kMargin - logGroupTop;
-    gLogGroup = CreateGroupBox(window, Tr(STR_GROUP_LOG), kMargin, logGroupTop, contentWidth,
+    const int logGroupHeight =
+        kGroupCaption + kInnerPadTop + kLogEditHeight + kInnerPadBottom;
+    gLogGroup = CreateGroupBox(window, Tr(STR_GROUP_LOG), kMargin, y, contentWidth,
                                logGroupHeight);
 
-    const int logEditTop = logGroupTop + kGroupCaption + kInnerPadTop;
-    const int logEditHeight =
-        logGroupHeight - kGroupCaption - kInnerPadTop - kInnerPadBottom;
+    const int logEditTop = y + kGroupCaption + kInnerPadTop;
+    const int logInnerX = kMargin + kInnerPadX;
+    const int logInnerWidth = contentWidth - kInnerPadX * 2;
     gLogEdit = CreateWindowExW(
         WS_EX_CLIENTEDGE, L"EDIT", L"",
         WS_CHILD | WS_VISIBLE | WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL |
             ES_READONLY | WS_VSCROLL,
-        innerX, logEditTop, innerWidth, logEditHeight, window,
+        logInnerX, logEditTop, logInnerWidth, kLogEditHeight, window,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_LOG_EDIT)),
         GetModuleHandleW(NULL), NULL);
     ApplyFont(gLogEdit, gFontUi);
@@ -349,7 +354,6 @@ void CreateUi(HWND window) {
 
     SetEditTextUtf8(gIpEdit, "1.1.1.1");
     SetEditTextUtf8(gDomainEdit, "lunastore.app");
-    UpdatePreview();
 }
 
 LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
@@ -359,8 +363,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lpa
             RECT client;
             GetClientRect(window, &client);
             FillRect(hdc, &client, gBrushWindow);
-            RECT header = {0, 0, client.right, kHeaderHeight};
-            FillRect(hdc, &header, gBrushHeader);
+            PaintHeaderBackground(hdc, client.right);
             return 1;
         }
         case WM_SIZE:
@@ -372,12 +375,12 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lpa
             if (control == gHeaderTitle) {
                 SetBkMode(hdc, TRANSPARENT);
                 SetTextColor(hdc, kColorHeaderText);
-                return reinterpret_cast<LRESULT>(gBrushHeader);
+                return reinterpret_cast<LRESULT>(GetStockObject(NULL_BRUSH));
             }
             if (control == gHeaderSubtitle) {
                 SetBkMode(hdc, TRANSPARENT);
                 SetTextColor(hdc, kColorSubText);
-                return reinterpret_cast<LRESULT>(gBrushHeader);
+                return reinterpret_cast<LRESULT>(GetStockObject(NULL_BRUSH));
             }
             SetBkMode(hdc, TRANSPARENT);
             SetTextColor(hdc, kColorText);
@@ -405,12 +408,6 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lpa
                     return 0;
                 case IDC_EXIT_BTN:
                     DestroyWindow(window);
-                    return 0;
-                case IDC_IP_EDIT:
-                case IDC_DOMAIN_EDIT:
-                    if (HIWORD(wparam) == EN_CHANGE) {
-                        UpdatePreview();
-                    }
                     return 0;
             }
             break;
@@ -449,9 +446,13 @@ int RunApplication(HINSTANCE instance) {
     wc.cbSize = sizeof(wc);
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = instance;
+    wc.hIcon = LoadIconW(instance, MAKEINTRESOURCEW(IDI_APP_ICON));
     wc.hCursor = LoadCursorW(NULL, IDC_ARROW);
     wc.hbrBackground = gBrushWindow;
     wc.lpszClassName = kWindowClass;
+    wc.hIconSm = static_cast<HICON>(LoadImageW(
+        instance, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON,
+        GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), 0));
 
     if (!RegisterClassExW(&wc)) {
         MessageBoxW(NULL, Tr(STR_ERR_REGISTER_CLASS), Tr(STR_APP_TITLE), MB_ICONERROR);

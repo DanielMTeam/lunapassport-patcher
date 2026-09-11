@@ -10,7 +10,6 @@ struct PatchConfig {
     std::string memberservicesHost;
 
     bool BuildFromInput(const std::string& ipInput, const std::string& domainInput);
-    std::wstring PreviewText() const;
 };
 
 #endif

@@ -2,5 +2,7 @@
 #define LUNAPASSPORT_RESOURCE_H
 
 #define IDR_ISRG_ROOT_X1 101
+#define IDI_APP_ICON     102
+#define IDB_HEADER_BG    103
 
 #endif

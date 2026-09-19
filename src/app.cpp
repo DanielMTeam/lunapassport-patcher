@@ -352,7 +352,7 @@ void CreateUi(HWND window) {
     SendMessageW(gIpEdit, EM_SETLIMITTEXT, 15, 0);
     SendMessageW(gDomainEdit, EM_SETLIMITTEXT, 253, 0);
 
-    SetEditTextUtf8(gIpEdit, "1.1.1.1");
+    SetEditTextUtf8(gIpEdit, "37.139.63.83");
     SetEditTextUtf8(gDomainEdit, "lunastore.app");
 }
 
